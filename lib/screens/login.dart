@@ -67,17 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       )
                     : Container(),
               ),
-              Image.asset('assets/socket_icon.png'),
-              const SizedBox(
-                height: 5,
-              ),
-              Text(
-                'Flutter Socket.IO',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(
-                height: 40,
-              ),
               TextField(
                 controller: _usernameController,
                 decoration: const InputDecoration(

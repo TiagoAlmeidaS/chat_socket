@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_socket_io/model/message.dart';
 import 'package:flutter_socket_io/providers/home.dart';
 import 'package:intl/intl.dart';
@@ -16,37 +18,46 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late IO.Socket _socket;
   final TextEditingController _messageInputController = TextEditingController();
+  List<Message> messageList = [];
 
   _sendMessage() {
-    _socket.emit('message', {
+    _socket.emit("message", {
       'message': _messageInputController.text.trim(),
       'sender': widget.username
     });
     _messageInputController.clear();
   }
 
-  _connectSocket() {
-    _socket.onConnect((data) => print('Connection established'));
-    _socket.onConnectError((data) => print('Connect Error: $data'));
-    _socket.onDisconnect((data) => print('Socket.IO server disconnected'));
-    _socket.on(
-      'message',
-      (data) => Provider.of<HomeProvider>(context, listen: false).addNewMessage(
-        Message.fromJson(data),
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
     //Important: If your server is running on localhost and you are testing your app on Android then replace http://localhost:3000 with http://10.0.2.2:3000
+    initSocket();
+  }
+
+  initSocket() {
     _socket = IO.io(
-      'http://localhost:3000',
-      IO.OptionBuilder().setTransports(['websocket']).setQuery(
-          {'username': widget.username}).build(),
-    );
-    _connectSocket();
+        "ws://${dotenv.get(kIsWeb ? "BASE_URL_WEB" : "BASE_URL_MOBILE")}:3000",
+        <String, dynamic>{
+          'autoConnect': false,
+          'transports': ['websocket'],
+          'query': {'username': widget.username}
+        });
+    _socket.connect();
+    _socket.onConnect((_) {
+      print('Connection established');
+    });
+    _socket.onDisconnect((_) => print('Connection Disconnection'));
+    _socket.onConnectError((err) => print(err));
+    _socket.onError((err) => print(err));
+    _socket.on(
+        "newMessage",
+        (data) => {
+              setState(() {
+                messageList.add(Message.fromJson(data));
+              }),
+              print(messageList.toString()),
+            });
   }
 
   @override
@@ -68,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (_, provider, __) => ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemBuilder: (context, index) {
-                  final message = provider.messages[index];
+                  final message = messageList[index];
                   return Wrap(
                     alignment: message.senderUsername == widget.username
                         ? WrapAlignment.end
@@ -87,6 +98,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ? CrossAxisAlignment.end
                                     : CrossAxisAlignment.start,
                             children: [
+                              Text(
+                                message.senderUsername,
+                                textAlign: TextAlign.left,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
                               Text(message.message),
                               Text(
                                 DateFormat('hh:mm a').format(message.sentAt),
@@ -102,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 separatorBuilder: (_, index) => const SizedBox(
                   height: 5,
                 ),
-                itemCount: provider.messages.length,
+                itemCount: messageList.length,
               ),
             ),
           ),
